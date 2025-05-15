@@ -327,13 +327,4 @@ Tests cover:
 
 ---
 
-## Assumptions & Notes
-
-- **Contributor IDs** are UUIDs
-- **Email sending** is simulated
-- **Zero Trust**: minimal privilege, strict validation
-- **In-Memory DB**: switch `DATABASE_URL="file:./dev.db?mode=memory&cache=shared"`
-
----
-
 Happy coding! 🚀 If you run into issues, please open a GitHub issue in the repository.
