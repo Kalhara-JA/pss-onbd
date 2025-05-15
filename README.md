@@ -134,8 +134,8 @@ AES_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
 ### Clone & Install
 
 ```bash
-git clone https://github.com/your-org/pss-contributor-onboarding.git
-cd pss-contributor-onboarding
+git clone https://github.com/Kalhara-JA/pss-onbd.git
+cd pss-onbd
 npm install
 ```
 
@@ -200,8 +200,8 @@ npm run start:dev
 Build and run:
 
 ```bash
-docker build -t pss-onboarding .
-docker run --env-file .env -p 3000:3000 pss-onboarding
+docker build -t pss-onbd .
+docker run --env-file .env -p 3000:3000 pss-onbd
 ```
 
 **Non-root user** is configured in the `Dockerfile` for improved security.
