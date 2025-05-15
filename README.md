@@ -1,98 +1,339 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Profit Shareholder™ System (PSS) – Contributor Onboarding (Tier 2)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A secure, production-ready NestJS backend module for inviting and registering platform contributors.
+Implements JWT-based auth, RBAC, rate limiting, audit trails, AES-256 encryption, and non-root Docker builds.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Table of Contents
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [Features](#features)
+- [Directory Structure](#directory-structure)
+- [Prerequisites](#prerequisites)
+- [Environment Variables](#environment-variables)
+- [Getting Started](#getting-started)
 
-## Project setup
+  - [Clone & Install](#clone--install)
+  - [Database Setup & Migrations](#database-setup--migrations)
+  - [Seed Admin User](#seed-admin-user)
+  - [Run Locally](#run-locally)
 
-```bash
-$ npm install
+- [Docker](#docker)
+- [API Reference](#api-reference)
+
+  - [Auth](#auth)
+
+    - `POST /auth/login`
+
+  - [Contributors](#contributors)
+
+    - `POST /invite-contributor`
+    - `POST /register`
+    - `GET /registration-status/:id`
+
+- [Security & Compliance](#security--compliance)
+- [Testing](#testing)
+- [Assumptions & Notes](#assumptions--notes)
+
+---
+
+## Features
+
+- **Invite Flow**: Admin-only endpoint to generate time-limited invitation tokens
+- **Registration**: Token-based contributor signup with `pending_approval` status
+- **JWT Auth**: Passport + `@nestjs/jwt`
+- **RBAC**: Route-level guard for Admin, Contributor, Auditor roles
+- **Rate Limiting**: 10 requests/minute per IP via `@nestjs/throttler`
+- **Audit Trail**: Middleware logs every request (timestamp, user ID, IP, endpoint, status)
+- **AES-256 Encryption**: Sensitive fields (e.g. bank account) encrypted at rest
+- **Non-Root Docker**: Secure container user setup
+- **OpenAPI (Swagger)**: Full API docs under `/api`
+- **Unit Tests**: Jest coverage for services, controllers, guards, middleware
+
+---
+
+## Directory Structure
+
+```
+pss-contributor-onboarding/
+├── Dockerfile
+├── .env.example
+├── README.md
+├── prisma/
+│   └── schema.prisma
+├── src/
+│   ├── main.ts
+│   ├── app.module.ts
+│   ├── prisma/
+│   │   ├── prisma.module.ts
+│   │   └── prisma.service.ts
+│   ├── common/
+│   │   ├── roles.decorator.ts
+│   │   ├── roles.guard.ts
+│   │   └── rate-limit.guard.ts
+│   ├── auth/
+│   │   ├── auth.module.ts
+│   │   ├── auth.service.ts
+│   │   ├── auth.controller.ts
+│   │   ├── dto/
+│   │   │   └── login.dto.ts
+│   │   ├── jwt.strategy.ts
+│   │   └── jwt-auth.guard.ts
+│   ├── contributor/
+│   │   ├── contributor.module.ts
+│   │   ├── contributor.service.ts
+│   │   ├── contributor.controller.ts
+│   │   └── dto/
+│   │       ├── invite-contributor.dto.ts
+│   │       └── register-contributor.dto.ts
+│   └── audit/
+│       ├── audit.module.ts
+│       └── audit.service.ts
+└── test/
+    ├── contributor.service.spec.ts
+    ├── contributor.controller.spec.ts
+    ├── auth.service.spec.ts
+    ├── roles.guard.spec.ts
+    └── audit.middleware.spec.ts
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## Prerequisites
 
-# watch mode
-$ npm run start:dev
+- **Node.js** ≥ 18
+- **npm** ≥ 8 (or Yarn)
+- **PostgreSQL** ≥ 12 (or SQLite for in-memory simulation)
+- **Docker** & **Docker Compose** (optional)
 
-# production mode
-$ npm run start:prod
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in your values:
+
+```dotenv
+# Server
+PORT=3000
+
+# JWT
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRATION=3600s
+
+# Database (PostgreSQL)
+DATABASE_URL=postgresql://user:password@localhost:5432/pss?schema=public
+
+# AES Encryption Key (32 bytes hex)
+AES_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
 ```
 
-## Run tests
+---
+
+## Getting Started
+
+### Clone & Install
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+git clone https://github.com/your-org/pss-contributor-onboarding.git
+cd pss-contributor-onboarding
+npm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Database Setup & Migrations
 
 ```bash
-$ npm install -g mau
-$ mau deploy
+# Generate Prisma client
+npx prisma generate
+
+# Run migrations (PostgreSQL) or use SQLite in-memory
+npx prisma migrate dev --name init
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Seed Admin User
 
-## Resources
+Create an initial Admin contributor for testing:
 
-Check out a few resources that may come in handy when working with NestJS:
+```ts
+// prisma/seed.ts
+import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+const prisma = new PrismaClient();
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+async function main() {
+  const password = await bcrypt.hash('AdminPassword123', 10);
+  await prisma.contributor.upsert({
+    where: { email: 'admin@pss.com' },
+    update: {},
+    create: {
+      email: 'admin@pss.com',
+      name: 'Platform Admin',
+      password,
+      role: 'Admin',
+      status: 'approved',
+      bankAccount: '',
+    },
+  });
+}
 
-## Support
+main();
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Run:
 
-## Stay in touch
+```bash
+npm run db:seed
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Run Locally
 
-## License
+```bash
+npm run start:dev
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Swagger UI: `http://localhost:3000/api`
+- Invite endpoint protected by Bearer token
+
+---
+
+## Docker
+
+Build and run:
+
+```bash
+docker build -t pss-onboarding .
+docker run --env-file .env -p 3000:3000 pss-onboarding
+```
+
+**Non-root user** is configured in the `Dockerfile` for improved security.
+
+---
+
+## API Reference
+
+### Auth
+
+#### `POST /auth/login`
+
+Authenticate and receive JWT.
+
+- **Body**
+
+  ```json
+  {
+    "email": "admin@pss.com",
+    "password": "AdminPassword123"
+  }
+  ```
+
+- **Response**
+
+  ```json
+  {
+    "access_token": "eyJ..."
+  }
+  ```
+
+### Contributors
+
+All `/invite-contributor` endpoints require `Authorization: Bearer <token>` with an Admin JWT.
+
+#### `POST /invite-contributor`
+
+Invite a new contributor.
+
+- **Body**
+
+  ```json
+  {
+    "email": "user@example.com",
+    "role": "pgc",
+    "department": "dev-team"
+  }
+  ```
+
+- **Response**
+
+  ```json
+  {
+    "token": "abc123...",
+    "expiresAt": "2025-05-16T12:00:00.000Z"
+  }
+  ```
+
+#### `POST /register`
+
+Register using invitation token.
+
+- **Body**
+
+  ```json
+  {
+    "token": "abc123...",
+    "name": "Alice",
+    "password": "securePass",
+    "role": "npgc"
+  }
+  ```
+
+- **Response**
+
+  ```json
+  {
+    "id": "uuid",
+    "email": "user@example.com",
+    "status": "pending_approval"
+  }
+  ```
+
+#### `GET /registration-status/:id`
+
+Check contributor’s registration status.
+
+- **Response**
+
+  ```json
+  { "status": "pending_approval" }
+  ```
+
+---
+
+## Security & Compliance
+
+- **JWT** with Passport and strong secret
+- **RBAC** via custom `RolesGuard`
+- **Rate Limiting** (10 req/min)
+- **Input Validation** with `class-validator`
+- **Audit Trail** logs in `AuditLog` table
+- **AES-256 Encryption** for sensitive data
+- **Non-Root Docker** user
+
+---
+
+## Testing
+
+Run unit tests:
+
+```bash
+npm run test
+```
+
+Tests cover:
+
+- Service methods (`invite`, `register`, `status`)
+- Controllers delegation
+- AuthService token issuance
+- RolesGuard logic
+- Audit middleware logging
+
+---
+
+## Assumptions & Notes
+
+- **Contributor IDs** are UUIDs
+- **Email sending** is simulated
+- **Zero Trust**: minimal privilege, strict validation
+- **In-Memory DB**: switch `DATABASE_URL="file:./dev.db?mode=memory&cache=shared"`
+
+---
+
+Happy coding! 🚀 If you run into issues, please open a GitHub issue in the repository.

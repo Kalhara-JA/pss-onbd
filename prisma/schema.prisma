@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Contributor {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String
+  name        String
+  role        Role         @default(npgc)
+  department  String?
+  status      Status       @default(pending_approval)
+  bankAccount String // AES-256 encrypted hex
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  invitations Invitation[]
+  auditLogs   AuditLog[]
+}
+
+model Invitation {
+  id            String       @id @default(uuid())
+  email         String
+  role          Role
+  token         String       @unique
+  department    String?
+  expiresAt     DateTime
+  used          Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  Contributor   Contributor? @relation(fields: [contributorId], references: [id])
+  contributorId String?
+}
+
+model AuditLog {
+  id            String       @id @default(uuid())
+  userId        String?
+  ip            String
+  endpoint      String
+  statusCode    Int
+  timestamp     DateTime     @default(now())
+  Contributor   Contributor? @relation(fields: [contributorId], references: [id])
+  contributorId String?
+}
+
+enum Role {
+  Admin
+  Contributor
+  Auditor
+  pgc
+  npgc
+}
+
+enum Status {
+  pending_approval
+  approved
+  rejected
+}
